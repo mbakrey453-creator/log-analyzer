@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Intrusion Detection Log Analyzer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l8 3.5v5.2c0 5-3.4 9.3-8 11.3-4.6-2-8-6.3-8-11.3V5.5L12 2z"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Intrusion Detection Log Analyzer</h1>
+          <p>Queue &middot; Linked List &middot; Circular Array &middot; Stack &mdash; simulated IDS</p>
+        </div>
+      </div>
+      <div class="status-zone">
+        <span id="connDot" class="conn-dot wait" title="Server connection"></span>
+        <div class="chips">
+          <span class="chip"><span class="chip-label">Queue</span><b id="chipQueue">0</b></span>
+          <span class="chip"><span class="chip-label">History</span><b id="chipHistory">0</b></span>
+          <span class="chip"><span class="chip-label">Window</span><b id="chipWindow">0/50</b></span>
+          <span class="chip"><span class="chip-label">Blocked</span><b id="chipBlocked">0</b></span>
+          <span class="chip"><span class="chip-label">Undo stack</span><b id="chipStack">0</b></span>
+          <span class="chip"><span class="chip-label">Threshold</span><b id="chipThreshold">5</b></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="toolbar" aria-label="Tool groups">
+
+      <!-- GROUP: DATA SOURCE -->
+      <div class="card" data-accent="blue">
+        <div class="card-head">
+          <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/>
+          </svg>
+          <h2>Data Source</h2>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label for="attempts">Virtual attempts</label>
+            <div class="field-row">
+              <input type="range" id="attemptsRange" min="10" max="500" step="5" value="50">
+              <input type="number" id="attempts" class="num num-sm" min="10" max="500" value="50">
+            </div>
+          </div>
+          <div class="field">
+            <label for="burstIp">Burst IP</label>
+            <input type="text" id="burstIp" value="192.0.2.44" spellcheck="false">
+          </div>
+          <div class="btn-col">
+            <button class="btn" id="btnGenerate">Generate Virtual Attacks</button>
+            <button class="btn" id="btnBurst">Auto-generate Burst</button>
+            <button class="btn" id="btnLoad">Load Log File</button>
+            <input type="file" id="fileInput" accept=".log,.txt" hidden>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUP: DETECTION SETTINGS -->
+      <div class="card" data-accent="purple">
+        <div class="card-head">
+          <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="7" x2="10" y2="7"/><circle cx="13" cy="7" r="2"/><line x1="15" y1="7" x2="20" y2="7"/>
+            <line x1="4" y1="12" x2="7" y2="12"/><circle cx="10" cy="12" r="2"/><line x1="12" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="17" x2="13" y2="17"/><circle cx="16" cy="17" r="2"/><line x1="18" y1="17" x2="20" y2="17"/>
+          </svg>
+          <h2>Detection Settings</h2>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label for="windowN">Window size N</label>
+            <input type="number" id="windowN" class="num" min="1" max="500" value="50">
+          </div>
+          <div class="field">
+            <label for="threshold">Fail threshold</label>
+            <input type="number" id="threshold" class="num" min="1" max="50" value="5">
+          </div>
+          <p class="hint">Block fires when an IP reaches <b id="hintThreshold">5</b> failures
+            inside the last <b id="hintN">50</b> events.</p>
+        </div>
+      </div>
+
+      <!-- GROUP: PROCESSING -->
+      <div class="card" data-accent="green">
+        <div class="card-head">
+          <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <h2>Processing</h2>
+        </div>
+        <div class="card-body">
+          <button class="btn btn-primary" id="btnProcess">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15" aria-hidden="true">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            Process Queue
+          </button>
+          <p class="hint">Dequeue &rarr; parse &rarr; Linked List &rarr; circular window &rarr; detect.</p>
+        </div>
+      </div>
+
+      <!-- GROUP: INSPECTION -->
+      <div class="card" data-accent="amber">
+        <div class="card-head">
+          <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+          <h2>Inspection</h2>
+        </div>
+        <div class="card-body">
+          <div class="btn-col">
+            <button class="btn" id="btnHistory">Show History</button>
+            <button class="btn" id="btnLastN">Show Last N</button>
+            <button class="btn" id="btnBlocked">Show Blocked IPs</button>
+          </div>
+          <p class="hint">Views append to the log; they never modify the structures.</p>
+        </div>
+      </div>
+
+      <!-- GROUP: MAINTENANCE -->
+      <div class="card" data-accent="red">
+        <div class="card-head">
+          <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/>
+          </svg>
+          <h2>Maintenance</h2>
+        </div>
+        <div class="card-body">
+          <div class="btn-col">
+            <button class="btn" id="btnUndo">Undo Last Block</button>
+            <button class="btn" id="btnClear">Clear All</button>
+          </div>
+          <p class="hint">Undo pops the Stack. Clear resets every structure.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panels">
+      <div class="panel-group">
+        <div class="panel panel-feed">
+          <div class="panel-head">
+            <h2>Event / detection log</h2>
+            <button class="mini-btn" id="btnClearFeed" title="Clear the on-screen feed">clear view</button>
+          </div>
+          <div class="terminal" id="feed" role="log"></div>
+        </div>
+        <div class="panel panel-window">
+          <div class="panel-head">
+            <h2>Circular window (last N events)</h2>
+            <span class="panel-note" id="windowNote">0 / 50</span>
+          </div>
+          <div class="terminal" id="windowView" role="log"></div>
+        </div>
+      </div>
+      <aside class="panel-group side">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Currently blocked IPs</h2>
+            <span class="panel-note" id="blockedNote">0</span>
+          </div>
+          <div class="list" id="blockedList"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Undo stack</h2>
+            <span class="stack-hint">top = last block</span>
+          </div>
+          <div class="list" id="stackList"></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Blocks are simulated (not a real firewall). Undo pops the Stack; Linked List history is never rewritten.
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,351 @@
+1. Title Block
+
+Delta University for Science and Technology
+Faculty of Artificial Intelligence
+Department of Cyber Security
+Course: Data Structures
+
+PROJECT PROPOSAL
+
+Title: Intrusion Detection Log Analyzer Using Fundamental Data Structures
+
+Student Name: [Student Name]
+Student ID:   [Student ID]
+Date:         [Date]
+Supervisor:   [Course Instructor]
+
+
+2. Introduction and Problem Statement
+
+Security operations consume ordered streams of authentication, web, and firewall events. A typical analysis task is to decide, from recent failed logins, whether a source IP should be blocked, while still retaining a complete audit trail and a way to reverse the last block if it was a false positive.
+
+If events are processed out of order, a detection rule that counts failures inside a time-or-count window is invalid. If every event is stored only in a grow-only structure, window scans become linear in the full history and memory is unbounded. If blocks cannot be undone in reverse chronological order, operators cannot correct the most recent action without scanning an unordered set.
+
+This project therefore treats three concurrent needs as one data-structure problem: (i) preserve arrival order while ingesting files, (ii) keep a bounded recent window for pattern detection, and (iii) record an unbounded history plus a LIFO undo log of simulated blocks. The four required structures are assigned to these needs rather than used as unrelated exercises.
+
+
+3. Objective
+
+The objective is to design and implement a command-line Python 3 prototype that:
+
+- reads SSH authentication, Apache access, and firewall-style text logs;
+- ingests each line into a FIFO Queue so processing order matches file/arrival order;
+- dequeues, parses, and appends every event to a singly Linked List history;
+- writes each event into a circular Array of fixed size N (the detection window);
+- counts failed authentications per source IP inside that window and, when the count meets a threshold, records a simulated “block IP” action on a Stack;
+- supports Undo by popping the most recent simulated block.
+
+The prototype does not configure a real firewall. A block is a recorded action (IP, reason, optional timestamp) that the CLI can list and reverse.
+
+
+4. Scope
+
+In scope:
+- Student-implemented Queue, singly Linked List with tail pointer, Stack, and circular Array (Python 3, standard library). collections.deque may be used only as an optional comparison, not as the required implementations.
+- Parsing of three text log families: SSH auth, Apache access, and simple firewall-style lines.
+- Detection rule: failed authentications from the same source IP inside a rolling window of N events; if count ≥ threshold, push a simulated block.
+- CLI operations: Load, Process, History, Last N, Blocked IPs, Undo, Exit.
+- Informal complexity discussion matching the implemented operations.
+
+Out of scope:
+- Real packet capture, live SSH daemons, or production SIEM.
+- Machine-learning classifiers, signature databases, or encrypted-log decoding.
+- Graphical user interface.
+- Persistent database; in-memory structures plus optional write of a short report file if time allows.
+- Actual iptables/Windows Firewall changes.
+
+
+5. Why This Project Is Suitable
+
+The assignment requires four structures. This problem needs exactly those four access patterns:
+
+- A log stream is a FIFO: the next line to parse is the oldest unprocessed line (Queue).
+- Full audit history grows only at the end and is scanned sequentially; size is unknown a priori (Linked List with tail).
+- “Undo last block” is LIFO (Stack).
+- Brute-force detection needs only the last N events at O(1) insert and O(N) memory, not the entire log (circular Array).
+
+The domain is appropriate for the Department of Cyber Security: authentication failures and IP blocking are standard defensive concepts, while every control-flow decision remains a data-structure decision. The CLI is easier to defend in a Data Structures course than a GUI, because demonstration time is spent on enqueue, dequeue, append, wrap-around insert, push, and pop.
+
+
+6. System Architecture
+
+Log files are the only input. Lines are enqueued in file order. A processor dequeues one event at a time, parses fields (timestamp if present, source IP, event type, success/failure), then updates three structures: the Linked List (complete history), the circular Array (bounded window), and, when the detection rule fires, the Stack (simulated blocks). The CLI is a thin driver over these ADTs.
+
+Figure 1. High-level architecture: log files feed a FIFO Queue; the processor updates Linked List history, a circular Array window, and a Stack of simulated blocks.
+
+        +-----------+       enqueue        +-----------+
+        | Log files | -------------------->|   Queue   |
+        | SSH/Apache|                      |   FIFO    |
+        | Firewall  |                      +-----+-----+
+        +-----------+                            |
+                                            dequeue
+                                                 v
+                                           +-----------+
+                                           | Processor |
+                                           | parse +   |
+                                           | detect    |
+                                           +-----+-----+
+                     +-----------+---------------+---------------+
+                     |           |               |               |
+                     v           v               v               v
+              +------------+ +------------+ +------------+  (CLI I/O)
+              | Linked List| | Circular   | |   Stack    |
+              |  history   | | Array win. | | undo blocks|
+              +------------+ +------------+ +------------+
+
+The Queue isolates I/O from analysis: all lines can be loaded before any detection runs, which makes demos repeatable. The Linked List never discards events, so History remains a full audit. The circular Array overwrites the oldest slot, so detection cost stays proportional to N. The Stack stores only block actions, not every event, so Undo is a single pop.
+
+
+7. How the Four Data Structures Work Together
+
+Processing is a single loop. After load, the Queue holds unparsed lines. Each iteration dequeues one line, appends a parsed node to the list, writes the same event into the next circular slot, then scans the window for per-IP failure counts. A new block is pushed only if the IP is not already marked blocked. Undo is independent of that loop: it pops the Stack and clears the blocked mark for that IP. History in the list is not rewritten by Undo; the list remains the audit trail of what was observed.
+
+Figure 2. End-to-end workflow from file load through optional undo of the last simulated block.
+
+    [Load files]
+         |
+         v
+    enqueue every line  ---->  Queue (unprocessed lines)
+         |
+         v
+    while Queue not empty:
+         |  dequeue
+         |  parse (IP, type, fail/success)
+         |  LinkedList.append_event
+         |  CircularArray.insert  (index = (index+1) mod N)
+         |  scan window: count failures per IP
+         |  if count >= threshold and IP not blocked:
+         |       Stack.push_block(IP, reason)
+         |       mark IP blocked
+         v
+    [CLI: History | Last N | Blocked IPs]
+         |
+         v
+    optional Undo: Stack.pop -> unmark IP  (list unchanged)
+
+FIFO guarantees that window contents reflect chronological processing. The list and the array store the same events under different constraints: unbounded sequential history versus bounded O(1) overwrite. The Stack is a side channel of operator actions, which is why Undo does not delete nodes from the list.
+
+
+8. Detailed Explanation of Each Structure
+
+8.1 Queue
+
+Role. Hold raw log lines after Load and before Process.
+
+Operations. enqueue(line), dequeue(), is_empty(), optionally peek().
+
+Justification. Analysis must not reorder events. File order is the available proxy for arrival order. A FIFO Queue matches chronological processing of a stream: the first line read is the first line parsed. A list used only as a random-access array would invite index-based reordering; a stack would reverse the log. Implementation: singly linked queue with head and tail so enqueue and dequeue are O(1).
+
+8.2 Linked List
+
+Role. Growing history of every processed (parsed) event.
+
+Operations. append_event at the tail, traverse from head (History command). No insert-in-middle and no index lookup are required for the full log.
+
+Justification. History size is unknown and grows only at the tail. A dynamic array would also work for append, but the pedagogical ADT that matches “unknown length, sequential scan, no random index” is a singly linked list with a tail pointer. Traverse is O(n) in the number of processed events, which is acceptable because History is an audit dump, not the detection hot path.
+
+8.3 Stack
+
+Role. Simulated block actions for Undo.
+
+Operations. push_block(ip, reason), undo() = pop, is_empty().
+
+Justification. “Reverse the last simulated block” is the definition of LIFO. A queue would undo the oldest block first. A set of blocked IPs is still required for membership tests, but the ordered undo log must be a stack: each push records IP + reason; pop restores the previous operator state. History in the Linked List is left intact so the audit remains honest.
+
+8.4 Array (circular buffer)
+
+Role. Last N processed events; the only structure used for the detection scan.
+
+Operations. insert(event) at next slot with wrap-around; logical size up to N; window scan for per-IP failure counts.
+
+Justification. Pattern detection needs a bounded recent window, not the whole history. A fixed array of length N with index = (index + 1) mod N overwrites the oldest event in O(1) time and O(N) memory. After the buffer is full, every insert discards the oldest event automatically. Scanning N slots per event is O(N); N is a configured constant (window size), not the full log length. This is the structure that keeps detection independent of how long the Linked List grows.
+
+| Structure      | Role                                      | Operations                                      | Justification                                                                                          |
+|----------------|-------------------------------------------|-------------------------------------------------|--------------------------------------------------------------------------------------------------------|
+| Queue          | Ingest log lines in file/arrival order    | enqueue, dequeue, is_empty                      | FIFO matches chronological processing; reordering would invalidate the window                          |
+| Linked List    | Unbounded audit history of parsed events  | insert_at_end (tail), sequential traverse       | Unknown length; growth only at the tail; History needs no random index                                 |
+| Stack          | Simulated block actions for Undo          | push_block, pop (undo)                          | “Undo last action” is LIFO; a queue would reverse the oldest block first                               |
+| Circular Array | Bounded window of the last N events       | insert with wrap-around; scan N slots           | Detection needs only recent events; O(1) overwrite of the oldest; memory stays O(N)                    |
+
+
+9. Big-O Complexity Table
+
+Let n = number of processed events (list length / total dequeues). Let N = circular window capacity (N << n in a realistic log). Assume Queue and Stack are linked with head/tail as needed; Linked List has a tail pointer.
+
+| Structure        | Operation                         | Time     | Space notes                                      |
+|------------------|-----------------------------------|----------|--------------------------------------------------|
+| Queue            | enqueue                           | O(1)     | One node per unprocessed line                    |
+| Queue            | dequeue                           | O(1)     | Node released after parse                        |
+| Linked List      | append_event (tail pointer)       | O(1)     | O(n) nodes for full history                      |
+| Linked List      | traverse (History)                | O(n)     | Sequential; no extra buffers required            |
+| Stack            | push_block                        | O(1)     | One node per simulated block                     |
+| Stack            | pop (Undo)                        | O(1)     |                                                  |
+| Circular Array   | insert (modulo index)             | O(1)     | O(N) slots; overwrite oldest                     |
+| Circular Array   | window scan (per-IP fail counts)  | O(N)     | N = window size, independent of n                |
+
+Detection per event is therefore O(N) after O(1) dequeue, append, and insert. Full Process of a file with n lines is O(n·N). Undo remains O(1) and does not rescan the list.
+
+
+10. Code Sketch
+
+Python-like pseudocode only; not a complete program.
+
+# --- Queue (linked, head + tail) ---
+def enqueue(self, line):
+    node = Node(line)
+    if self.tail is None:
+        self.head = self.tail = node
+    else:
+        self.tail.next = node
+        self.tail = node
+    self.size += 1
+
+def dequeue(self):
+    if self.head is None:
+        raise EmptyQueueError
+    line = self.head.data
+    self.head = self.head.next
+    if self.head is None:
+        self.tail = None
+    self.size -= 1
+    return line
+
+# --- Linked List (singly, tail pointer) ---
+def append_event(self, event):
+    node = Node(event)
+    if self.tail is None:
+        self.head = self.tail = node
+    else:
+        self.tail.next = node
+        self.tail = node
+    self.size += 1
+
+# --- Stack ---
+def push_block(self, ip, reason):
+    self.top = Node((ip, reason), next=self.top)
+
+def undo(self):
+    if self.top is None:
+        return None
+    ip, reason = self.top.data
+    self.top = self.top.next
+    return ip, reason
+
+# --- Circular Array ---
+class CircularBuffer:
+    def __init__(self, N):
+        self.buf = [None] * N
+        self.N = N
+        self.index = 0      # next write position
+        self.count = 0      # logical size, max N
+
+    def insert(self, event):
+        self.buf[self.index] = event
+        self.index = (self.index + 1) % self.N
+        if self.count < self.N:
+            self.count += 1
+
+
+11. Proposed Interface
+
+The interface is a numbered CLI. Load reads one or more files into the Queue. Process runs the dequeue/parse/detect loop. History traverses the Linked List. Last N prints the circular buffer in chronological order (oldest in window first). Blocked IPs lists the current blocked set and, if useful for the demo, the Stack from top to bottom. Undo pops one block. Exit terminates.
+
+Figure 3. CLI mockup with main menu and a sample detection line after Process.
+
+    ============================================================
+     Log Window Detector  |  DS Course Prototype
+    ============================================================
+     1) Load log files
+     2) Process queue
+     3) History (linked list)
+     4) Last N events (circular array)
+     5) Blocked IPs
+     6) Undo last block (stack)
+     7) Exit
+    ------------------------------------------------------------
+     Queue size: 0   History: 1284   Window N: 50   Blocks: 3
+    ============================================================
+     Select: 2
+
+     [detect] IP 192.0.2.44  failed_auth=5 in last 50 events
+              -> simulated BLOCK  (pushed on undo stack)
+
+The sample line is the evidence the professor should see: the window, the counter, and the Stack push are visible in one place. Menu item 4 proves the Array is circular (fixed N). Menu item 3 proves the list still holds all 1284 events. Menu item 6 proves LIFO undo without rewriting history.
+
+
+12. Tools and Technologies
+
+- Language: Python 3.
+- Required ADTs: student-implemented Queue, Linked List, Stack, circular Array.
+- Optional comparison only: collections.deque (must not replace the four implementations).
+- Input: plain-text sample logs (SSH-like, Apache combined/common-style, firewall-style). Synthetic files are acceptable if they contain ordered failures from repeated IPs.
+- Environment: any standard Python 3 interpreter; no third-party packages.
+- Documentation: this proposal, short in-code comments, and a final report with the same figures redrawn in Word if required.
+
+
+13. Timeline (8 weeks)
+
+| Week | Tasks                                              | Deliverable                         |
+|------|----------------------------------------------------|-------------------------------------|
+| 1    | Proposal; collect/write sample logs; ADT contracts | Approved proposal; log fixtures     |
+| 2    | Queue; circular Array insert and wrap-around       | Passing ADT tests for Q and Array   |
+| 3    | Linked List history with tail append and traverse  | History dump from list              |
+| 4    | Parsers for SSH, Apache, and firewall-style lines  | Parsed event objects from samples   |
+| 5    | Detection on the window; Stack push/pop undo       | Threshold blocks + Undo demo        |
+| 6    | CLI menu; integrate load–process–query–undo        | End-to-end CLI                      |
+| 7    | Tests; complexity write-up; fixed demo script      | Test log + Big-O section            |
+| 8    | Report; Word figures; oral rehearsal               | Final report and demo               |
+
+
+14. Expected Outcomes
+
+- A working CLI that loads mixed text logs, processes them in FIFO order, and prints history, last N events, and blocked IPs.
+- Four ADTs with the operations listed above, each justified by a concrete system need.
+- A stated detection rule: failed authentications per source IP inside the circular window of N events; block when count ≥ threshold; simulated only.
+- O(1) undo of the last block via Stack pop, without deleting Linked List nodes.
+- Informal complexity results: Process O(n·N), window insert O(1), undo O(1).
+- Sample logs and a short demo script so the same blocks appear in every defense.
+
+
+15. Conclusion
+
+The project is a single pipeline: Queue for ordered ingestion, Linked List for unbounded audit history, circular Array for O(N)-memory detection, and Stack for LIFO reversal of simulated blocks. Those four roles are forced by the problem (chronology, unknown history length, bounded window, undo-last), which is the correct academic justification for using all required structures. The prototype stays inside a Data Structures course: Python 3, CLI, no live firewall, and a detection rule that is a window count rather than a black-box model.
+
+
+==============================================================================
+How to Fit This Into 1–3 Pages
+(this section is not part of the academic submission; use it when pasting into Word)
+==============================================================================
+
+Layout
+- Font: 11 pt Calibri or Times New Roman.
+- Margins: 1 inch.
+- Spacing: single; 0–6 pt after paragraphs.
+- Title block: compact (university, department, course, title, name/ID/date on a few lines).
+- Figures: 8–9 pt monospaced (Consolas/Courier); keep each ASCII figure in a small one-row table or a text box so Word does not wrap the art.
+- Tables: Autofit to window; 10 pt; no extra blank rows.
+
+What must remain even in a 1–3 page cut
+- Data-structures roles table (or the equivalent paragraph in §8 if you merge §7–§8).
+- Three figures (architecture, workflow, CLI) with captions.
+- Big-O table.
+- One-sentence detection rule and the FIFO / LIFO / circular-window justifications.
+- 8-week timeline table.
+
+If the document exceeds 3 pages, cut in this order
+1. Scope (keep five in-scope bullets; drop most out-of-scope lines).
+2. Tools and Technologies (one short paragraph).
+3. Duplicate explanations: §6 paragraph after Figure 1 and §7 paragraph after Figure 2 can each be two sentences.
+4. Code sketch: keep only CircularBuffer.insert plus one of enqueue/dequeue; move the rest to an appendix if the instructor allows it.
+5. Expected Outcomes: three bullets.
+
+Do not cut
+- Why each structure fits the problem.
+- N = window size vs n = history length in the complexity table.
+- Statement that blocks are simulated (not a real firewall).
+- Undo = Stack pop; history list unchanged.
+
+Word conversion
+- Paste into Word as “Keep text only,” then apply Normal style.
+- Convert markdown tables via Insert > Table or a markdown-to-table add-in.
+- Replace [Student Name], [Student ID], [Date], and [Course Instructor].

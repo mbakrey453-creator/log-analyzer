@@ -1,0 +1,14 @@
+# Dedicated brute-force burst against 10.0.0.5 (sshd) from 192.0.2.44
+Oct 21 18:42:01 server sshd[3101]: Accepted publickey for alice from 203.0.113.10 port 52001 ssh2
+Oct 21 18:42:05 server sshd[3110]: Failed password for root from 192.0.2.44 port 53211 ssh2
+Oct 21 18:42:06 server sshd[3111]: Failed password for root from 192.0.2.44 port 53212 ssh2
+Oct 21 18:42:07 server sshd[3112]: Failed password for root from 192.0.2.44 port 53213 ssh2
+Oct 21 18:42:08 server sshd[3113]: Failed password for admin from 192.0.2.44 port 53214 ssh2
+Oct 21 18:42:09 server sshd[3114]: Failed password for root from 192.0.2.44 port 53215 ssh2
+Oct 21 18:42:10 server sshd[3115]: Invalid user test from 192.0.2.44 port 53216
+Oct 21 18:42:11 server sshd[3116]: Failed password for root from 192.0.2.44 port 53217 ssh2
+Oct 21 18:42:12 server sshd[3117]: Failed password for ubuntu from 192.0.2.44 port 53218 ssh2
+Oct 21 18:42:13 fw kernel: [UFW BLOCK] IN=eth0 OUT= SRC=192.0.2.44 DST=10.0.0.5 DPT=22 PROTO=TCP
+Oct 21 18:42:20 server sshd[3200]: Accepted password for bob from 198.51.100.40 port 44112 ssh2
+203.0.113.22 - - [21/Oct/2026:18:42:25 +0000] "GET / HTTP/1.1" 200 980
+192.0.2.44 - - [21/Oct/2026:18:42:26 +0000] "POST /login HTTP/1.1" 401 318

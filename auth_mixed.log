@@ -1,0 +1,23 @@
+# Mixed SSH / Apache / firewall sample for Load Log File
+Oct 21 18:40:01 server sshd[2211]: Accepted publickey for alice from 203.0.113.10 port 51022 ssh2
+Oct 21 18:40:08 server sshd[2214]: Failed password for root from 198.51.100.8 port 44190 ssh2
+Oct 21 18:40:12 server sshd[2218]: Accepted password for bob from 203.0.113.22 port 50211 ssh2
+203.0.113.10 - - [21/Oct/2026:18:40:20 +0000] "GET / HTTP/1.1" 200 1450
+198.51.100.40 - - [21/Oct/2026:18:40:22 +0000] "GET /login HTTP/1.1" 401 512
+Oct 21 18:40:25 fw kernel: [UFW BLOCK] IN=eth0 OUT= SRC=198.51.100.8 DST=10.0.0.5 DPT=22 PROTO=TCP
+Oct 21 18:40:31 server sshd[2301]: Failed password for root from 192.0.2.44 port 53211 ssh2
+Oct 21 18:40:32 server sshd[2302]: Failed password for root from 192.0.2.44 port 53212 ssh2
+Oct 21 18:40:33 server sshd[2303]: Failed password for admin from 192.0.2.44 port 53213 ssh2
+Oct 21 18:40:34 server sshd[2304]: Invalid user hadoop from 192.0.2.44 port 53214
+Oct 21 18:40:35 server sshd[2305]: Failed password for root from 192.0.2.44 port 53215 ssh2
+Oct 21 18:40:36 server sshd[2306]: Failed password for ubuntu from 192.0.2.44 port 53216 ssh2
+Oct 21 18:40:37 server sshd[2307]: Failed password for root from 192.0.2.44 port 53217 ssh2
+Oct 21 18:40:40 server sshd[2310]: Accepted password for alice from 203.0.113.10 port 51100 ssh2
+192.0.2.80 - - [21/Oct/2026:18:40:45 +0000] "POST /admin HTTP/1.1" 403 220
+this line is malformed and should not crash the analyzer
+Oct 21 18:40:50 server sshd[2401]: Failed password for oracle from 198.51.100.77 port 40001 ssh2
+Oct 21 18:40:51 server sshd[2402]: Failed password for oracle from 198.51.100.77 port 40002 ssh2
+Oct 21 18:40:52 server sshd[2403]: Failed password for oracle from 198.51.100.77 port 40003 ssh2
+Oct 21 18:40:53 server sshd[2404]: Failed password for oracle from 198.51.100.77 port 40004 ssh2
+Oct 21 18:40:54 server sshd[2405]: Failed password for oracle from 198.51.100.77 port 40005 ssh2
+Oct 21 18:40:55 fw kernel: [UFW BLOCK] IN=eth0 OUT= SRC=198.51.100.77 DST=10.0.0.5 DPT=22 PROTO=TCP
